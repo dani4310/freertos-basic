@@ -4,7 +4,6 @@
 #include <string.h>
 #include "fio.h"
 #include "filesystem.h"
-
 #include "FreeRTOS.h"
 #include "task.h"
 #include "host.h"
@@ -25,7 +24,7 @@ void host_command(int, char **);
 void mmtest_command(int, char **);
 void test_command(int, char **);
 void _command(int, char **);
-
+double sqrt(double );
 #define MKCL(n, d) {.name=#n, .fptr=n ## _command, .desc=d}
 
 cmdlist cl[]={
@@ -39,6 +38,30 @@ cmdlist cl[]={
 	MKCL(test, "test new function"),
 	MKCL(, ""),
 };
+
+
+double sqrt(double x)
+  {
+    double small = 0.001;
+    double low, high;
+    if (x < 0) 
+    fio_printf(1,"This is negative!!");
+    if (x < 1) { 
+      low = 0; high = 1; 
+    } else {
+      low = 1; high = x;  
+    }
+    while (high - low > small)  
+    {
+      double mid = (low + high) / 2;
+      if (mid*mid > x)          
+        high = mid;
+      else
+        low = mid;            
+    }
+    return low+small;
+  }
+
 
 int parse_command(char *str, char *argv[]){
 	int b_quote=0, b_dbquote=0;
@@ -159,8 +182,73 @@ void help_command(int n,char *argv[]){
 		fio_printf(1, "%s - %s\r\n", cl[i].name, cl[i].desc);
 	}
 }
-
 void test_command(int n, char *argv[]) {
+	char flag;
+	int i,j;
+        int length=strlen(argv[2]);
+        int number=0;
+	int sqrtnumber;
+	if(n==3){
+		 for(i=0;i<length;i++){
+                                if(argv[2][i]>'9'||argv[2][i]<'0'){
+                                        fio_printf(1,"\r\ninput error\r\n");
+                                        return;
+                                }
+                                number=number*10+(int)(argv[2][i]-'0');
+                 } 
+                if(strcmp(argv[1],"fib")==0){
+                        
+			int previous =-1;
+			int result =1;
+			int sum=0;
+			for(i=0;i<=number;i++){
+				sum=result+previous;
+				previous=result;
+				result=sum;
+			}
+			fio_printf(1,"\r\nThe fibonacci sequence at %d is: %d",number,result);
+                }
+		if(strcmp(argv[1],"ispri")==0){
+			flag=0;
+			sqrtnumber=(int)(sqrt((double)number));
+			for(i=2;i<=sqrtnumber;i++){
+				if(!(number%i)){
+					flag=1;
+					break;
+				}
+
+			}
+			if(flag){
+				fio_printf(1,"\r\n%d is composite number!",number);
+			}
+			else{
+				fio_printf(1,"\r\n%d is prime number!",number);
+			}
+		}
+		if(strcmp(argv[1],"priat")==0){
+			int count=0;
+			flag=0;
+			j=1;
+			while(count<number){
+				j++;
+				sqrtnumber=(int)(sqrt((double)j));
+				for(i=2;i<=sqrtnumber;i++){
+					if(!(j%i)){
+						flag=1;
+						break;
+					}
+								}
+				if(!flag){
+				count++;
+				}
+				flag=0;
+				
+			
+			}
+			fio_printf(1,"\r\nThe prime number at %d is:%d",number,j);
+		}
+        }
+   
     int handle;
     int error;
 
