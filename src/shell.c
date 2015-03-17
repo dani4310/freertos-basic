@@ -7,12 +7,14 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "host.h"
-
+char taskflag=0;
 typedef struct {
 	const char *name;
 	cmdfunc *fptr;
 	const char *desc;
 } cmdlist;
+void vTaskCode( void * pvParameters );
+void donothing( void * pvParameters );
 
 void ls_command(int, char **);
 void man_command(int, char **);
@@ -23,9 +25,18 @@ void help_command(int, char **);
 void host_command(int, char **);
 void mmtest_command(int, char **);
 void test_command(int, char **);
+void Dtask_command(int,char **);
+void new_command(int,char **);
 void _command(int, char **);
+
 double sqrt(double );
+int CharToInt(char *);
+
 #define MKCL(n, d) {.name=#n, .fptr=n ## _command, .desc=d}
+	const int maxtask=10;
+	int testmatrix[4];	
+	char tttable[10]={0,0,0,0,0,0,0,0,0,0};
+	xTaskHandle tthandle[10];
 
 cmdlist cl[]={
 	MKCL(ls, "List directory"),
@@ -36,6 +47,8 @@ cmdlist cl[]={
 	MKCL(mmtest, "heap memory allocation test"),
 	MKCL(help, "help"),
 	MKCL(test, "test new function"),
+	MKCL(Dtask, "Delete the task which is not using"),
+	MKCL(new, "test new task"),
 	MKCL(, ""),
 };
 
@@ -182,74 +195,59 @@ void help_command(int n,char *argv[]){
 		fio_printf(1, "%s - %s\r\n", cl[i].name, cl[i].desc);
 	}
 }
-void test_command(int n, char *argv[]) {
-	char flag;
-	int i,j;
-        int length=strlen(argv[2]);
-        int number=0;
-	int sqrtnumber;
-	if(n==3){
-		 for(i=0;i<length;i++){
-                                if(argv[2][i]>'9'||argv[2][i]<'0'){
-                                        fio_printf(1,"\r\ninput error\r\n");
-                                        return;
-                                }
-                                number=number*10+(int)(argv[2][i]-'0');
-                 } 
-                if(strcmp(argv[1],"fib")==0){
-                        
-			int previous =-1;
-			int result =1;
-			int sum=0;
-			for(i=0;i<=number;i++){
-				sum=result+previous;
-				previous=result;
-				result=sum;
-			}
-			fio_printf(1,"\r\nThe fibonacci sequence at %d is: %d",number,result);
-                }
-		if(strcmp(argv[1],"ispri")==0){
-			flag=0;
-			sqrtnumber=(int)(sqrt((double)number));
-			for(i=2;i<=sqrtnumber;i++){
-				if(!(number%i)){
-					flag=1;
-					break;
-				}
 
-			}
-			if(flag){
-				fio_printf(1,"\r\n%d is composite number!",number);
-			}
-			else{
-				fio_printf(1,"\r\n%d is prime number!",number);
-			}
+void Dtask_command(int n, char *argv[]) {
+	int i;
+	for(i=0;i<maxtask;i++){
+		if(tttable[i]==2){
+			vTaskDelete(tthandle[i]);
+			tttable[i]=0;
 		}
-		if(strcmp(argv[1],"priat")==0){
-			int count=0;
-			flag=0;
-			j=1;
-			while(count<number){
-				j++;
-				sqrtnumber=(int)(sqrt((double)j));
-				for(i=2;i<=sqrtnumber;i++){
-					if(!(j%i)){
-						flag=1;
-						break;
-					}
-								}
-				if(!flag){
-				count++;
-				}
-				flag=0;
-				
-			
-			}
-			fio_printf(1,"\r\nThe prime number at %d is:%d",number,j);
-		}
-        }
+	}
+	fio_printf(1,"\r\n");
+
+}
+
+
+
+void test_command(int n, char *argv[]) {
+
+		int i;
+        int number=CharToInt(argv[2]);
+		int handleposition=-1;
+		if(n==3){
+
+    while(testmatrix[0]==1)//avoid other task using testmatrix
+    {}
+    testmatrix[0]=1;
+    testmatrix[1]=number;
+
+    if(strcmp(argv[1],"fib")==0)
+    	testmatrix[2]=0;
+    if(strcmp(argv[1],"ispri")==0)
+    	testmatrix[2]=1;
+    if(strcmp(argv[1],"priat")==0)
+    	testmatrix[2]=2;
+
+    for(i=0;i<maxtask;i++){
+    	if(tttable[i]==0){
+    	tttable[i]=1;
+    	handleposition=i;
+    	break;
+    	}
+    }
+    testmatrix[3]=handleposition;
+    if(handleposition==-1){
+    	fio_printf(1,"\r\ntask position is all using");
+    	return;
+    }
+    
+	xTaskCreate( vTaskCode,(signed portCHAR *)"tTask", 256, testmatrix,0|portPRIVILEGE_BIT,&tthandle[handleposition]); 
+
+	}	 
    
     int handle;
+
     int error;
 
     fio_printf(1, "\r\n");
@@ -272,6 +270,140 @@ void test_command(int n, char *argv[]) {
     }
 
     host_action(SYS_CLOSE, handle);
+    	
+}
+
+void vTaskCode( void * pvParameters )
+{
+	char hint[] = USER_NAME "@" USER_NAME "-STM32:~$ ";
+	int number=testmatrix[1];
+	int argv=testmatrix[2];
+	int handleposition=testmatrix[3];
+	testmatrix[0]=0;
+
+	char flag;
+	int sqrtnumber;
+	int i,j;
+		 
+        if(argv==0){
+                        
+			int previous =-1;
+			int result =1;
+			int sum=0;
+			for(i=0;i<=number;i++){
+				sum=result+previous;
+				previous=result;
+				result=sum;
+			}
+			while(taskflag!=0){}
+			taskflag=1;
+			fio_printf(1,"\r\nThe fibonacci sequence at %d is: %d",number,result);
+			taskflag=0;
+        }
+		if(argv==1){
+			flag=0;
+			sqrtnumber=(int)(sqrt((double)number));
+			for(i=2;i<=sqrtnumber;i++){
+				if(!(number%i)){
+					flag=1;
+					break;
+				}
+
+			}
+			if(flag){
+				while(taskflag!=0){}
+				taskflag=1;
+				fio_printf(1,"\r\n%d is composite number!",number);
+				taskflag=0;
+			}
+			else{
+				while(taskflag!=0){}
+				taskflag=1;
+				fio_printf(1,"\r\n%d is prime number!",number);
+				taskflag=0;
+			}
+		}
+		if(argv==2){
+			int count=0;
+			flag=0;
+			j=1;
+			while(count<number){
+				j++;
+				sqrtnumber=(int)(sqrt((double)j));
+				for(i=2;i<=sqrtnumber;i++){
+					if(!(j%i)){
+						flag=1;
+						break;
+					}
+								}
+				if(!flag){
+				count++;
+				}
+				flag=0;
+				
+			
+			}
+			while(taskflag!=0){}
+			taskflag=1;
+			fio_printf(1,"\r\nThe prime number at %d is:%d",number,j);
+			
+			taskflag=0;
+			
+		}
+			while(taskflag!=0){}
+			taskflag=1;
+			fio_printf(1,"\r\n%s",hint);
+			taskflag=0;
+
+		tttable[handleposition]=2;
+	for( ;; )
+  {
+  }
+}
+void new_command(int n, char *argv[]){
+	int i,j,handleposition;
+	int ntonew=CharToInt(argv[1]);
+	for(i=0;i<ntonew;i++){
+		for(j=0;j<maxtask;j++){
+    		if(tttable[j]==0){
+    		tttable[j]=2;
+    		handleposition=j;
+    		break;
+    		}
+    	}
+    	if(handleposition==-1){
+    		fio_printf(1,"\r\ntask position is all using");
+    		return;
+    	}
+
+		if(xTaskCreate( donothing,(signed portCHAR *)"NewT", 512, NULL,0|portPRIVILEGE_BIT,&tthandle[handleposition])==pdPASS)
+			fio_printf(1,"\r\nThe task creates successfully.");
+		else{
+			fio_printf(1,"\r\nCan't create task.");
+			tttable[j]=0;
+		}
+	}
+	fio_printf(1,"\r\n");
+}
+
+void donothing(void *pvParameters){
+	for(;;)
+	{}
+}
+
+int CharToInt(char *ch){
+		int i;
+        int length=strlen(ch);
+        int number=0;
+	
+		for(i=0;i<length;i++){
+            if(ch[i]>'9'||ch[i]<'0'){
+            	fio_printf(1,"\r\ninput error\r\n");
+                return -1;
+            }
+            number=number*10+(int)(ch[i]-'0');
+        } 
+        return number;
 }
 
 void _command(int n, char *argv[]){
