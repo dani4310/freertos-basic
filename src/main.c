@@ -142,16 +142,16 @@ void system_logger(void *pvParameters)
     char output[512] = {0};
     char *tag = "\nName          State   Priority  Stack  Num\n*******************************************\n";
     int handle, error;
-    const portTickType xDelay = 100000 / 100;
+    const portTickType xDelay = 6000 / portTICK_RATE_MS;//six second saved message once
 
     handle = host_action(SYS_OPEN, "output/syslog", 4);
     if(handle == -1) {
         fio_printf(1, "Open file error!\n");
         return;
     }
-
+    memcpy(output, tag, strlen(tag));
     while(1) {
-        memcpy(output, tag, strlen(tag));
+        
         error = host_action(SYS_WRITE, handle, (void *)output, strlen(output));
         if(error != 0) {
             fio_printf(1, "Write file error! Remain %d bytes didn't write in the file.\n\r", error);
@@ -160,7 +160,6 @@ void system_logger(void *pvParameters)
         }
         vTaskList(buf);
 
-        memcpy(output, (char *)(buf + 2), strlen((char *)buf) - 2);
 
         error = host_action(SYS_WRITE, handle, (void *)buf, strlen((char *)buf));
         if(error != 0) {
@@ -199,12 +198,12 @@ int main()
 	            (signed portCHAR *) "CLI",
 	            512 /* stack size */, NULL, tskIDLE_PRIORITY + 2, NULL);
 
-#if 0
+
 	/* Create a task to record system log. */
 	xTaskCreate(system_logger,
 	            (signed portCHAR *) "Logger",
 	            1024 /* stack size */, NULL, tskIDLE_PRIORITY + 1, NULL);
-#endif
+
 
 	/* Start running the tasks. */
 	vTaskStartScheduler();
