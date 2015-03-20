@@ -7,6 +7,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "host.h"
+#include "queue.h"
 
 typedef struct {
 	const char *name;
@@ -33,13 +34,19 @@ void _command(int, char **);
 double sqrt(double );
 int CharToInt(char *);
 
+
+
 #define MKCL(n, d) {.name=#n, .fptr=n ## _command, .desc=d}
 	
-	har taskflag=0;
+
 	const int maxtask=10;
-	int testmatrix[4];	
 	char tttable[10]={0,0,0,0,0,0,0,0,0,0};
 	xTaskHandle tthandle[10];
+
+	xQueueHandle testjobqueue = NULL;
+	xQueueHandle printqueue = NULL;
+	xTaskHandle testjobtaskhandle = NULL;
+
 
 cmdlist cl[]={
 	MKCL(ls, "List directory"),
@@ -211,39 +218,35 @@ void Dtask_command(int n, char *argv[]) {
 }
 
 void test_command(int n, char *argv[]) {
-	int i;
+	int mes;
+	if(testjobtaskhandle==NULL){
+		xTaskCreate( vTaskCode, (signed portCHAR *)"tTask", 256, NULL, 0|portPRIVILEGE_BIT, &testjobtaskhandle);
+	}
+	if(testjobqueue==NULL){
+		testjobqueue=xQueueCreate( 10, sizeof( int ) );
+	}
+
+	//int i;
 	int number=CharToInt(argv[2]);
-	int handleposition=-1;
+	//int handleposition=-1;
 	if(n==3){
 		if(number == -1)
 			return;
-		while(testmatrix[0]==1)//avoid other task using testmatrix
-		{}
-    	testmatrix[0]=1;
-    	testmatrix[1]=number;
 
 		if(strcmp(argv[1],"fib")==0)
-    		testmatrix[2]=0;
-		if(strcmp(argv[1],"ispri")==0)
-			testmatrix[2]=1;
-		if(strcmp(argv[1],"priat")==0)
-			testmatrix[2]=2;
-
-		for(i=0;i<maxtask;i++){
-			if(tttable[i]==0){
-				tttable[i]=1;
-				handleposition=i;
-				break;
-			}
-		}
-    	testmatrix[3]=handleposition;
-	
-		if(handleposition==-1){
-			fio_printf(1,"\r\ntask position is all using");
-			return;
-		}
-
-		xTaskCreate( vTaskCode,(signed portCHAR *)"tTask", 256, testmatrix,0|portPRIVILEGE_BIT,&tthandle[handleposition]); 
+			mes=0;
+		else if(strcmp(argv[1],"ispri")==0)
+			mes=1;
+		else if(strcmp(argv[1],"priat")==0)
+			mes=2;
+		if( xQueueSend( testjobqueue, ( void * ) &mes, ( portTickType ) 5 ) != pdPASS ){
+            // Failed to post the message, even after 5 ticks.
+            fio_printf(1,"\r\nFailed to post the message to queue.");
+        	}
+        if( xQueueSend( testjobqueue, ( void * ) &number, ( portTickType ) 5 ) != pdPASS ){
+            // Failed to post the message, even after 5 ticks.
+            fio_printf(1,"\r\nFailed to post the message to queue.");
+        	}
 	}	 
    
     int handle;
@@ -272,85 +275,96 @@ void test_command(int n, char *argv[]) {
     	
 }
 
-void vTaskCode( void * pvParameters )
-{
-	char hint[] = USER_NAME "@" USER_NAME "-STM32:~$ ";
-	int number=testmatrix[1];
-	int argv=testmatrix[2];
-	int handleposition=testmatrix[3];
-	testmatrix[0]=0;
-
+void vTaskCode( void * pvParameters ){
+	int number,argv;
 	char flag;
-	int sqrtnumber;
-	int i,j;
-		 
-	if(argv==0){                   
-		int previous =-1;
-		int result =1;
-		int sum=0;
-		for(i=0;i<=number;i++){
-			sum=result+previous;
-			previous=result;
-			result=sum;
-		}
-		while(taskflag!=0){}
-		taskflag=1;
-		fio_printf(1,"\r\nThe fibonacci sequence at %d is: %d",number,result);
-		taskflag=0;
-	}
-	if(argv==1){
-		flag=0;
-		sqrtnumber=(int)(sqrt((double)number));
-		for(i=2;i<=sqrtnumber;i++){
-			if(!(number%i)){
-				flag=1;
-				break;
-			}
-		}
-		if(flag){
-			while(taskflag!=0){}
-			taskflag=1;
-			fio_printf(1,"\r\n%d is composite number!",number);
-			taskflag=0;
-		}
-		else{
-			while(taskflag!=0){}
-			taskflag=1;
-			fio_printf(1,"\r\n%d is prime number!",number);
-			taskflag=0;
-		}
-	}
-	if(argv==2){
-		int count=0;
-		flag=0;
-		j=1;
-		while(count<number){
-			j++;
-			sqrtnumber=(int)(sqrt((double)j));
-			for(i=2;i<=sqrtnumber;i++){
-				if(!(j%i)){
-					flag=1;
-					break;
-				}
-			}
-			if(!flag){
-			count++;
-			}
-			flag=0;
-		}
-		while(taskflag!=0){}
-		taskflag=1;
-		fio_printf(1,"\r\nThe prime number at %d is:%d",number,j);
-		taskflag=0;
-	}
-	while(taskflag!=0){}
-	taskflag=1;
-	fio_printf(1,"\r\n%s",hint);
-	taskflag=0;
+	printqueue=xQueueCreate( 15, sizeof( int ) );
+	while(1){
+		if( xQueueReceive( testjobqueue, &( argv ), ( portTickType ) 10 )==pdTRUE){
 
-	tttable[handleposition]=2;
-	for( ;; )
-  	{}
+			while(xQueueReceive( testjobqueue, &( number ), ( portTickType ) 10 )!=pdTRUE)
+			{}
+
+			int sqrtnumber;
+			int i,j;
+				 
+			if(argv==0){                   
+				int previous =-1;
+				int result =1;
+				int sum=0;
+				for(i=0;i<=number;i++){
+					sum=result+previous;
+					previous=result;
+					result=sum;
+				}
+				if( xQueueSend( printqueue, ( void * ) &argv, ( portTickType ) 5 ) != pdPASS ){
+            		fio_printf(1,"\r\nFailed to post the message to queue.");
+        		}
+        		if( xQueueSend( printqueue, ( void * ) &number, ( portTickType ) 5 ) != pdPASS ){
+            		fio_printf(1,"\r\nFailed to post the message to queue.");
+        		}
+        		if( xQueueSend( printqueue, ( void * ) &result, ( portTickType ) 5 ) != pdPASS ){
+            	// Failed to post the message, even after 5 ticks.
+            		fio_printf(1,"\r\nFailed to post the message to queue.");
+        		}
+
+			}
+			if(argv==1){
+					flag=0;
+					sqrtnumber=(int)(sqrt((double)number));
+					for(i=2;i<=sqrtnumber;i++){
+						if(!(number%i)){
+							flag=1;
+							break;
+						}
+					}
+					if( xQueueSend( printqueue, ( void * ) &argv, ( portTickType ) 5 ) != pdPASS ){
+	            	// Failed to post the message, even after 5 ticks.
+	            		fio_printf(1,"\r\nFailed to post the message to queue.");
+	        		}
+	        		if( xQueueSend( printqueue, ( void * ) &number, ( portTickType ) 5 ) != pdPASS ){
+	            	// Failed to post the message, even after 5 ticks.
+	            		fio_printf(1,"\r\nFailed to post the message to queue.");
+	        		}
+	        		if( xQueueSend( printqueue, ( void * ) &flag, ( portTickType ) 5 ) != pdPASS ){
+	            	// Failed to post the message, even after 5 ticks.
+	            		fio_printf(1,"\r\nFailed to post the message to queue.");
+	        		}
+
+			}
+			if(argv==2){
+				int count=0;
+				flag=0;
+				j=1;
+				while(count<number){
+					j++;
+					sqrtnumber=(int)(sqrt((double)j));
+					for(i=2;i<=sqrtnumber;i++){
+						if(!(j%i)){
+							flag=1;
+							break;
+						}
+					}
+					if(!flag){
+					count++;
+					}
+					flag=0;
+				}
+				if( xQueueSend( printqueue, ( void * ) &argv, ( portTickType ) 5 ) != pdPASS ){
+            	// Failed to post the message, even after 5 ticks.
+            		fio_printf(1,"\r\nFailed to post the message to queue.");
+        		}
+        		if( xQueueSend( printqueue, ( void * ) &number, ( portTickType ) 5 ) != pdPASS ){
+            	// Failed to post the message, even after 5 ticks.
+            		fio_printf(1,"\r\nFailed to post the message to queue.");
+        		}
+        		if( xQueueSend( printqueue, ( void * ) &j, ( portTickType ) 5 ) != pdPASS ){
+            	// Failed to post the message, even after 5 ticks.
+            		fio_printf(1,"\r\nFailed to post the message to queue.");
+        		}
+			}
+		}
+	}
 }
 void new_command(int n, char *argv[]){
 	int i,j,handleposition;
@@ -415,4 +429,8 @@ cmdfunc *do_command(const char *cmd){
 			return cl[i].fptr;
 	}
 	return NULL;	
+}
+
+void *getqueuehandle(void){
+	return &printqueue;
 }
