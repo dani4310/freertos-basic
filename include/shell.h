@@ -7,4 +7,6 @@ typedef void cmdfunc(int, char *[]);
 
 cmdfunc *do_command(const char *str);
 
+void *getqueuehandle(void);
+
 #endif
