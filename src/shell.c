@@ -277,7 +277,7 @@ void test_command(int n, char *argv[]) {
 
 void vTaskCode( void * pvParameters ){
 	int number,argv;
-	char flag;
+	int flag;
 	printqueue=xQueueCreate( 15, sizeof( int ) );
 	while(1){
 		if( xQueueReceive( testjobqueue, &( argv ), ( portTickType ) 10 )==pdTRUE){
