@@ -28,6 +28,7 @@ volatile xSemaphoreHandle serial_tx_wait_sem = NULL;
 /* Add for serial input */
 volatile xQueueHandle serial_rx_queue = NULL;
 
+
 /* IRQ handler to handle USART2 interruptss (both transmit and receive
  * interrupts). */
 void USART2_IRQHandler()
@@ -90,6 +91,10 @@ void command_prompt(void *pvParameters)
 	char buf[128];
 	char *argv[20];
     char hint[] = USER_NAME "@" USER_NAME "-STM32:~$ ";
+    int todo,in,out;
+    
+    xQueueHandle *printqueue;
+    printqueue=getqueuehandle();
 
 	fio_printf(1, "\rWelcome to FreeRTOS Shell\r\n");
 	while(1){
@@ -104,6 +109,29 @@ void command_prompt(void *pvParameters)
 			fptr(n, argv);
 		else
 			fio_printf(2, "\r\n\"%s\" command not found.\r\n", argv[0]);
+
+		if(*printqueue!=NULL){
+			if( xQueueReceive( *printqueue, &( todo ), ( portTickType ) 10 )==pdTRUE){
+				do{
+					while(xQueueReceive( *printqueue, &( in ), ( portTickType ) 10 )!=pdTRUE)
+					{}
+					while(xQueueReceive( *printqueue, &( out ), ( portTickType ) 10 )!=pdTRUE)
+					{}
+					if(todo==0)
+						fio_printf(1,"Work done!   The fibonacci sequence at %d is: %d\r\n",in,out);
+					if(todo==1){
+						if(out==1)
+							fio_printf(1,"Work done!   %d is composite number!\r\n",in);
+						else
+							fio_printf(1,"Work done!   %d is prime number!\r\n",in);
+					}
+					if(todo==2)
+						fio_printf(1,"Work done!   The prime number at %d is:%d\r\n",in,out);
+					//fio_printf(1, "\r\n\"%s\" command not found.\r\n", argv[0]);
+					
+				}while(xQueueReceive( *printqueue, &( todo ), ( portTickType ) 1 )==pdTRUE);
+			}
+		}
 	}
 
 }
